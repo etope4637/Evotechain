@@ -6,6 +6,7 @@ import { BiometricSecurityService } from './services/biometricSecurityService';
 import { NINValidationService } from './services/ninValidationService';
 import { AuditSecurityService } from './services/auditSecurityService';
 import { ConfigService } from './services/configService';
+import { LandingPage } from './components/LandingPage';
 
 // Components
 import { LoginForm } from './components/admin/LoginForm';
@@ -19,7 +20,7 @@ import { SystemSettings } from './components/admin/SystemSettings';
 import { SecureVoterInterface } from './components/voter/SecureVoterInterface';
 
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState('landing');
   const [isInitialized, setIsInitialized] = useState(false);
   const authProvider = useAuthProvider();
 
@@ -77,7 +78,9 @@ function App() {
   return (
     <AuthContext.Provider value={authProvider}>
       <div className="App">
-        {!authProvider.user && currentView !== 'voter' ? (
+        {currentView === 'landing' ? (
+          <LandingPage onNavigate={handleNavigate} />
+        ) : !authProvider.user && currentView !== 'voter' ? (
           <LoginForm />
         ) : currentView === 'voter' ? (
           <SecureVoterInterface onNavigate={handleNavigate} />
