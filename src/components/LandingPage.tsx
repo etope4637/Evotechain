@@ -92,7 +92,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               </div>
               <div className="p-8">
                 <button
-                  onClick={() => onNavigate('voter')}
+                  onClick={() => onNavigate('voter-portal')}
                   className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   Enter Voter Portal

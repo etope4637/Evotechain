@@ -17,11 +17,17 @@ import { VoterManagement } from './components/admin/VoterManagement';
 import { ResultsAnalytics } from './components/admin/ResultsAnalytics';
 import { AuditDashboard } from './components/admin/AuditDashboard';
 import { SystemSettings } from './components/admin/SystemSettings';
-import { SecureVoterInterface } from './components/voter/SecureVoterInterface';
+import { VoterPortal } from './components/voter/VoterPortal';
+import { VoterLogin } from './components/voter/VoterLogin';
+import { VoterRegister } from './components/voter/VoterRegister';
+import { BiometricVerification } from './components/voter/BiometricVerification';
+import { VotingDashboard } from './components/voter/VotingDashboard';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [voterNIN, setVoterNIN] = useState('');
+  const [registrationData, setRegistrationData] = useState<any>(null);
   const authProvider = useAuthProvider();
 
   useEffect(() => {
@@ -59,6 +65,25 @@ function App() {
     setCurrentView(view);
   };
 
+  const handleVoterLoginSuccess = (nin: string) => {
+    setVoterNIN(nin);
+    setCurrentView('biometric-login');
+  };
+
+  const handleVoterRegisterSuccess = (data: any) => {
+    setRegistrationData(data);
+    setCurrentView('biometric-register');
+  };
+
+  const handleBiometricSuccess = () => {
+    if (currentView === 'biometric-login') {
+      setCurrentView('voting-dashboard');
+    } else if (currentView === 'biometric-register') {
+      // After registration, go to login
+      setCurrentView('voter-login');
+      setRegistrationData(null);
+    }
+  };
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -80,10 +105,30 @@ function App() {
       <div className="App">
         {currentView === 'landing' ? (
           <LandingPage onNavigate={handleNavigate} />
+        ) : currentView === 'voter-portal' ? (
+          <VoterPortal onNavigate={handleNavigate} />
+        ) : currentView === 'voter-login' ? (
+          <VoterLogin onNavigate={handleNavigate} onLoginSuccess={handleVoterLoginSuccess} />
+        ) : currentView === 'voter-register' ? (
+          <VoterRegister onNavigate={handleNavigate} onRegisterSuccess={handleVoterRegisterSuccess} />
+        ) : currentView === 'biometric-login' ? (
+          <BiometricVerification 
+            onNavigate={handleNavigate} 
+            onVerificationSuccess={handleBiometricSuccess}
+            nin={voterNIN}
+            mode="login"
+          />
+        ) : currentView === 'biometric-register' ? (
+          <BiometricVerification 
+            onNavigate={handleNavigate} 
+            onVerificationSuccess={handleBiometricSuccess}
+            nin={registrationData?.nin || ''}
+            mode="register"
+          />
+        ) : currentView === 'voting-dashboard' ? (
+          <VotingDashboard onNavigate={handleNavigate} nin={voterNIN} />
         ) : !authProvider.user && currentView !== 'voter' ? (
           <LoginForm />
-        ) : currentView === 'voter' ? (
-          <SecureVoterInterface onNavigate={handleNavigate} />
         ) : (
           <Layout currentView={currentView} onNavigate={handleNavigate}>
             {currentView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
