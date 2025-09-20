@@ -135,7 +135,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
               </div>
               <div className="p-8">
                 <button
-                  onClick={() => onNavigate('admin')}
+                  onClick={() => onNavigate('dashboard')}
                   className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   Enter Admin Portal
