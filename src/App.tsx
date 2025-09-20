@@ -79,8 +79,8 @@ function App() {
     if (currentView === 'biometric-login') {
       setCurrentView('voting-dashboard');
     } else if (currentView === 'biometric-register') {
-      // After registration, go to login
-      setCurrentView('voter-login');
+      // After registration biometric capture, go to login
+      setCurrentView('voter-portal');
       setRegistrationData(null);
     }
   };
@@ -127,7 +127,7 @@ function App() {
           />
         ) : currentView === 'voting-dashboard' ? (
           <VotingDashboard onNavigate={handleNavigate} nin={voterNIN} />
-        ) : !authProvider.user && currentView !== 'voter' ? (
+        ) : !authProvider.user && !currentView.startsWith('voter') ? (
           <LoginForm />
         ) : (
           <Layout currentView={currentView} onNavigate={handleNavigate}>
