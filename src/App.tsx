@@ -17,11 +17,13 @@ import { VoterManagement } from './components/admin/VoterManagement';
 import { ResultsAnalytics } from './components/admin/ResultsAnalytics';
 import { AuditDashboard } from './components/admin/AuditDashboard';
 import { SystemSettings } from './components/admin/SystemSettings';
+import { VoterAnalytics } from './components/admin/VoterAnalytics';
 import { VoterPortal } from './components/voter/VoterPortal';
 import { VoterLogin } from './components/voter/VoterLogin';
 import { VoterRegister } from './components/voter/VoterRegister';
 import { BiometricVerification } from './components/voter/BiometricVerification';
 import { VotingDashboard } from './components/voter/VotingDashboard';
+import { VoterDatabaseService } from './services/voterDatabaseService';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing');
@@ -164,6 +166,7 @@ function App() {
             {currentView === 'elections' && <ElectionManagement onNavigate={handleNavigate} />}
             {currentView === 'results' && <ResultsAnalytics onNavigate={handleNavigate} />}
             {currentView === 'voters' && <VoterManagement onNavigate={handleNavigate} />}
+            {currentView === 'analytics' && <VoterAnalytics onNavigate={handleNavigate} />}
             {currentView === 'audit' && <AuditDashboard onNavigate={handleNavigate} />}
             {currentView === 'settings' && <SystemSettings onNavigate={handleNavigate} />}
           </Layout>

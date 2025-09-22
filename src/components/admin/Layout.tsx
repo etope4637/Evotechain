@@ -28,6 +28,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onNavigat
     { name: 'Elections', icon: Vote, key: 'elections' },
     { name: 'Results', icon: BarChart3, key: 'results' },
     { name: 'Voters', icon: Users, key: 'voters' },
+    { name: 'Analytics', icon: BarChart3, key: 'analytics' },
     { name: 'Audit Trail', icon: Shield, key: 'audit' },
     { name: 'Settings', icon: Settings, key: 'settings' }
   ];
