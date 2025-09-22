@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Eye, EyeOff, ArrowLeft, AlertCircle } from 'lucide-react';
+import { VoterDatabaseService } from '../../services/voterDatabaseService';
 
 interface VoterLoginProps {
   onNavigate: (view: string) => void;
@@ -25,10 +26,20 @@ export const VoterLogin: React.FC<VoterLoginProps> = ({ onNavigate, onLoginSucce
     setIsLoading(true);
     
     try {
-      // Simulate NIN validation
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Check if voter exists in database
+      const voter = await VoterDatabaseService.findVoterByNIN(nin);
       
-      // For demo purposes, accept any valid format NIN
+      if (!voter) {
+        setError('Voter not found. Please register first or check your NIN.');
+        return;
+      }
+
+      if (!voter.isActive) {
+        setError('Your account has been suspended. Please contact INEC for assistance.');
+        return;
+      }
+
+      // Proceed to biometric verification
       onLoginSuccess(nin);
     } catch (error) {
       setError('Login failed. Please check your NIN and try again.');
@@ -121,9 +132,9 @@ export const VoterLogin: React.FC<VoterLoginProps> = ({ onNavigate, onLoginSucce
             <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="text-sm font-medium text-blue-900 mb-2">Demo NINs for Testing:</h4>
               <div className="text-sm text-blue-800 space-y-1">
-                <p><strong>12345678901</strong> - Adebayo Johnson</p>
-                <p><strong>12345678902</strong> - Fatima Ibrahim</p>
-                <p><strong>12345678903</strong> - Chinedu Okafor</p>
+                <p><strong>12345678901</strong> - Register first to use</p>
+                <p><strong>12345678902</strong> - Register first to use</p>
+                <p><strong>12345678903</strong> - Register first to use</p>
               </div>
             </div>
 

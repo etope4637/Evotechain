@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Eye, CheckCircle, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { VoterDatabaseService } from '../../services/voterDatabaseService';
+import { BiometricService } from '../../services/biometricService';
 
 interface BiometricVerificationProps {
   onNavigate: (view: string) => void;
@@ -86,11 +88,23 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
       // Step 4: Processing
       setCaptureStep('processing');
       setInstructions('Processing biometric data...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      if (mode === 'login') {
+        // Authenticate existing voter
+        const fakeEmbedding = Array.from({length: 128}, () => Math.random());
+        const authResult = await VoterDatabaseService.authenticateVoter(nin, fakeEmbedding);
+        
+        if (!authResult.success) {
+          throw new Error(authResult.error || 'Authentication failed');
+        }
+      } else {
+        // For registration, we'll store the biometric data in the next step
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
 
       // Step 5: Complete
       setCaptureStep('complete');
-      setInstructions('Biometric verification successful!');
+      setInstructions(mode === 'login' ? 'Authentication successful!' : 'Biometric data captured successfully!');
       
       // Auto-proceed after success
       setTimeout(() => {
@@ -98,7 +112,7 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
       }, 1500);
 
     } catch (error) {
-      setError('Biometric capture failed. Please try again.');
+      setError(error instanceof Error ? error.message : 'Biometric capture failed. Please try again.');
       setCaptureStep('ready');
       setInstructions('Position your face in the center and click Start Capture');
       setLivenessTests({
@@ -260,7 +274,7 @@ export const BiometricVerification: React.FC<BiometricVerificationProps> = ({
                     className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-medium flex items-center justify-center"
                   >
                     <CheckCircle className="h-5 w-5 mr-2" />
-                    Verification Complete
+                    {mode === 'login' ? 'Authentication Complete' : 'Capture Complete'}
                   </button>
                 )}
 

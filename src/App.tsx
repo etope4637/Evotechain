@@ -79,8 +79,37 @@ function App() {
     if (currentView === 'biometric-login') {
       setCurrentView('voting-dashboard');
     } else if (currentView === 'biometric-register') {
-      // After registration biometric capture, go to login
-      setCurrentView('voter-portal');
+      // Complete registration with biometric data
+      completeVoterRegistration();
+    }
+  };
+
+  const completeVoterRegistration = async () => {
+    if (!registrationData) return;
+
+    try {
+      // Generate fake biometric embedding for demo
+      const fakeEmbedding = Array.from({length: 128}, () => Math.random());
+      
+      const result = await VoterDatabaseService.registerVoter({
+        ...registrationData,
+        dateOfBirth: new Date(registrationData.dateOfBirth),
+        faceEmbedding: fakeEmbedding,
+        biometricQuality: 0.95
+      });
+
+      if (result.success) {
+        alert('Registration completed successfully! You can now login.');
+        setCurrentView('voter-login');
+      } else {
+        alert(`Registration failed: ${result.error}`);
+        setCurrentView('voter-register');
+      }
+    } catch (error) {
+      console.error('Error completing registration:', error);
+      alert('Registration failed. Please try again.');
+      setCurrentView('voter-register');
+    } finally {
       setRegistrationData(null);
     }
   };

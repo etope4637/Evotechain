@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Vote, BarChart3, Clock, CheckCircle, User, LogOut, Eye, Download } from 'lucide-react';
 import { Election, Candidate } from '../../types';
 import { ElectionService } from '../../services/electionService';
+import { VoterDatabaseService } from '../../services/voterDatabaseService';
 
 interface VotingDashboardProps {
   onNavigate: (view: string) => void;
@@ -14,27 +15,52 @@ export const VotingDashboard: React.FC<VotingDashboardProps> = ({ onNavigate, ni
   const [selectedElection, setSelectedElection] = useState<Election | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<string>('');
-  const [hasVoted, setHasVoted] = useState<{ [electionId: string]: boolean }>({});
+  const [voter, setVoter] = useState<any>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [voteReceipt, setVoteReceipt] = useState<string>('');
   const [showReceipt, setShowReceipt] = useState(false);
+  const [electionResults, setElectionResults] = useState<{ [electionId: string]: any }>({});
 
   useEffect(() => {
+    loadVoterData();
     loadElections();
   }, []);
 
+  const loadVoterData = async () => {
+    try {
+      const voterData = await VoterDatabaseService.findVoterByNIN(nin);
+      setVoter(voterData);
+    } catch (error) {
+      console.error('Error loading voter data:', error);
+    }
+  };
+
   const loadElections = async () => {
     try {
-      const activeElections = await ElectionService.getActiveElections();
-      setElections(activeElections);
+      const allElections = await ElectionService.getAllElections();
       
-      // Load voting status for each election
-      const votingStatus: { [electionId: string]: boolean } = {};
-      for (const election of activeElections) {
-        // In a real implementation, check if user has voted
-        votingStatus[election.id] = Math.random() > 0.7; // Simulate some elections already voted
+      // Filter elections that voter is eligible for
+      const voterData = await VoterDatabaseService.findVoterByNIN(nin);
+      if (voterData) {
+        const eligibleElections = allElections.filter(election => 
+          voterData.eligibleElections.includes(election.id) ||
+          election.status === 'active' // Show all active elections for now
+        );
+        setElections(eligibleElections);
+        
+        // Load results for each election
+        const results: { [electionId: string]: any } = {};
+        for (const election of eligibleElections) {
+          try {
+            const result = await ElectionService.getElectionResults(election.id);
+            results[election.id] = result;
+          } catch (error) {
+            console.error(`Error loading results for ${election.id}:`, error);
+          }
+        }
+        setElectionResults(results);
       }
-      setHasVoted(votingStatus);
+      
     } catch (error) {
       console.error('Error loading elections:', error);
     }
@@ -66,19 +92,27 @@ export const VotingDashboard: React.FC<VotingDashboardProps> = ({ onNavigate, ni
       const { vote, receiptCode } = await ElectionService.castVote({
         electionId: selectedElection.id,
         candidateId: selectedCandidate,
-        voterId: nin, // In real implementation, use proper voter ID
+        voterId: voter?.id || nin,
         timestamp: new Date(),
         isOffline: !navigator.onLine
       });
 
+      // Update voter's voting history
+      if (voter) {
+        await VoterDatabaseService.recordVote(voter.id, selectedElection.id, receiptCode);
+      }
+
       setVoteReceipt(receiptCode);
       setShowReceipt(true);
-      setHasVoted(prev => ({ ...prev, [selectedElection.id]: true }));
       
       // Reset selection
       setSelectedElection(null);
       setSelectedCandidate('');
       setActiveTab('dashboard');
+      
+      // Reload data to reflect vote
+      loadVoterData();
+      loadElections();
     } catch (error) {
       console.error('Error casting vote:', error);
       alert('Error casting vote. Please try again.');
@@ -121,6 +155,15 @@ Powered by INEC
     if (now < start) return { status: 'upcoming', color: 'bg-yellow-100 text-yellow-800' };
     if (now > end) return { status: 'ended', color: 'bg-gray-100 text-gray-800' };
     return { status: 'active', color: 'bg-green-100 text-green-800' };
+  };
+
+  const hasVotedInElection = (electionId: string): boolean => {
+    return voter?.votingHistory[electionId]?.voted || false;
+  };
+
+  const getVotedCount = (): number => {
+    if (!voter) return 0;
+    return Object.values(voter.votingHistory).filter((history: any) => history.voted).length;
   };
 
   return (
@@ -211,9 +254,7 @@ Powered by INEC
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Votes Cast</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {Object.values(hasVoted).filter(Boolean).length}
-                    </p>
+                    <p className="text-3xl font-bold text-gray-900">{getVotedCount()}</p>
                   </div>
                   <CheckCircle className="h-8 w-8 text-blue-600" />
                 </div>
@@ -223,9 +264,7 @@ Powered by INEC
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Pending Votes</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {elections.length - Object.values(hasVoted).filter(Boolean).length}
-                    </p>
+                    <p className="text-3xl font-bold text-gray-900">{elections.length - getVotedCount()}</p>
                   </div>
                   <Clock className="h-8 w-8 text-yellow-600" />
                 </div>
@@ -240,7 +279,8 @@ Powered by INEC
               <div className="divide-y divide-gray-200">
                 {elections.map((election) => {
                   const status = getElectionStatus(election);
-                  const voted = hasVoted[election.id];
+                  const voted = hasVotedInElection(election.id);
+                  const result = electionResults[election.id];
                   
                   return (
                     <div key={election.id} className="p-6">
@@ -268,6 +308,12 @@ Powered by INEC
                                 <span>Location: {election.state}</span>
                               </>
                             )}
+                            {result && (
+                              <>
+                                <span>•</span>
+                                <span>Total Votes: {result.totalVotes}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                         <div className="flex space-x-3">
@@ -281,7 +327,14 @@ Powered by INEC
                             </button>
                           )}
                           <button
-                            onClick={() => {/* View results */}}
+                            onClick={() => {
+                              // Show detailed results
+                              if (result) {
+                                alert(`Election Results:\n${result.candidateResults.map((c: any) => 
+                                  `${c.candidateName} (${c.party}): ${c.voteCount} votes (${c.percentage.toFixed(1)}%)`
+                                ).join('\n')}`);
+                              }
+                            }}
                             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center space-x-2"
                           >
                             <Eye className="h-4 w-4" />
@@ -289,6 +342,34 @@ Powered by INEC
                           </button>
                         </div>
                       </div>
+                      
+                      {/* Live Results Preview */}
+                      {result && result.candidateResults.length > 0 && (
+                        <div className="mt-4 bg-gray-50 rounded-lg p-4">
+                          <h5 className="font-medium text-gray-900 mb-2">Live Results:</h5>
+                          <div className="space-y-2">
+                            {result.candidateResults.slice(0, 3).map((candidate: any, index: number) => (
+                              <div key={candidate.candidateId} className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                    index === 0 ? 'bg-yellow-500 text-white' :
+                                    index === 1 ? 'bg-gray-400 text-white' :
+                                    'bg-orange-600 text-white'
+                                  }`}>
+                                    {index + 1}
+                                  </span>
+                                  <span className="font-medium">{candidate.candidateName}</span>
+                                  <span className="text-gray-600">({candidate.party})</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-bold">{candidate.voteCount}</span>
+                                  <span className="text-gray-600 ml-1">({candidate.percentage.toFixed(1)}%)</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

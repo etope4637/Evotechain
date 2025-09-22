@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { UserPlus, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { VoterDatabaseService } from '../../services/voterDatabaseService';
+import { NINService } from '../../services/ninService';
 
 interface VoterRegisterProps {
   onNavigate: (view: string) => void;
@@ -43,18 +45,30 @@ export const VoterRegister: React.FC<VoterRegisterProps> = ({ onNavigate, onRegi
     setIsLoading(true);
     
     try {
-      // Simulate NIN validation with NIMC
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Check if voter already exists
+      const existingVoter = await VoterDatabaseService.findVoterByNIN(formData.nin);
+      if (existingVoter) {
+        setError('A voter with this NIN is already registered. Please use the login option.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Validate NIN with NIMC service
+      const ninValidation = await NINService.validateNIN(formData.nin);
+      if (!ninValidation.valid) {
+        setError(ninValidation.error || 'NIN validation failed');
+        setIsLoading(false);
+        return;
+      }
       
-      // For demo, auto-fill some data based on NIN
-      if (formData.nin.startsWith('123')) {
+      // Auto-fill data from NIMC if available
+      if (ninValidation.voterData) {
         setFormData(prev => ({
           ...prev,
-          firstName: 'Adebayo',
-          lastName: 'Johnson',
-          sex: 'male',
-          state: 'Lagos',
-          lga: 'Ikeja'
+          firstName: ninValidation.voterData.firstName,
+          lastName: ninValidation.voterData.lastName,
+          state: ninValidation.voterData.state,
+          lga: ninValidation.voterData.lga
         }));
       }
       
@@ -89,18 +103,8 @@ export const VoterRegister: React.FC<VoterRegisterProps> = ({ onNavigate, onRegi
       return;
     }
 
-    setIsLoading(true);
-    
-    try {
-      // Simulate registration processing
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      onRegisterSuccess(formData);
-    } catch (error) {
-      setError('Registration failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // Proceed to biometric capture
+    onRegisterSuccess(formData);
   };
 
   const updateFormData = (field: string, value: string) => {

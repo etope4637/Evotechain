@@ -2,6 +2,7 @@ import { Election, Candidate, Vote, ElectionResult, AuditLog } from '../types';
 import { StorageService } from './storageService';
 import { BlockchainService } from './blockchainService';
 import { CryptoService } from './cryptoService';
+import { VoterDatabaseService } from './voterDatabaseService';
 
 export class ElectionService {
   static async createElection(electionData: Omit<Election, 'id' | 'createdAt' | 'updatedAt'>): Promise<Election> {
@@ -13,6 +14,14 @@ export class ElectionService {
     };
 
     await StorageService.addToStore('elections', election);
+    
+    // Update voter eligibility for this election
+    await VoterDatabaseService.updateVoterEligibility(
+      election.id, 
+      election.type, 
+      election.state, 
+      election.lga
+    );
     
     // Add to blockchain
     await BlockchainService.addBlock({
@@ -43,6 +52,15 @@ export class ElectionService {
 
     await StorageService.updateInStore('elections', updatedElection);
 
+    // If election is being activated, update voter eligibility
+    if (updates.status === 'active') {
+      await VoterDatabaseService.updateVoterEligibility(
+        electionId,
+        updatedElection.type,
+        updatedElection.state,
+        updatedElection.lga
+      );
+    }
     // Add to blockchain
     await BlockchainService.addBlock({
       type: 'election_updated',

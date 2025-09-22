@@ -17,6 +17,7 @@ import { Election, SystemStats } from '../../types';
 import { ElectionService } from '../../services/electionService';
 import { StorageService } from '../../services/storageService';
 import { BlockchainService } from '../../services/blockchainService';
+import { VoterDatabaseService, VoterStats } from '../../services/voterDatabaseService';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
@@ -26,15 +27,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [elections, setElections] = useState<Election[]>([]);
-  const [stats, setStats] = useState<SystemStats>({
-    totalVoters: 0,
-    totalVotes: 0,
-    onlineVotes: 0,
-    offlineVotes: 0,
-    syncPendingVotes: 0,
-    biometricSuccessRate: 0,
-    activeElections: 0
-  });
+  const [voterStats, setVoterStats] = useState<VoterStats | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [blockchainHealth, setBlockchainHealth] = useState<boolean>(false);
 
@@ -58,24 +51,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const electionsData = await ElectionService.getAllElections();
       setElections(electionsData);
 
-      // Load system statistics
-      const allVotes = await StorageService.getAllFromStore('votes');
-      const allVoters = await StorageService.getAllFromStore('voters');
-      
-      const onlineVotes = allVotes.filter(v => !v.isOffline).length;
-      const offlineVotes = allVotes.filter(v => v.isOffline).length;
-      const syncPendingVotes = allVotes.filter(v => v.syncStatus === 'pending').length;
-      const activeElections = electionsData.filter(e => e.status === 'active').length;
-
-      setStats({
-        totalVoters: allVoters.length,
-        totalVotes: allVotes.length,
-        onlineVotes,
-        offlineVotes,
-        syncPendingVotes,
-        biometricSuccessRate: 94.2, // Simulated
-        activeElections
-      });
+      // Load voter statistics
+      const stats = await VoterDatabaseService.getVoterStatistics();
+      setVoterStats(stats);
 
       // Check blockchain health
       const isValid = await BlockchainService.validateBlockchain();
@@ -85,35 +63,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     }
   };
 
-  const getElectionTypeData = () => {
-    const typeCounts = elections.reduce((acc, election) => {
-      acc[election.type] = (acc[election.type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  const getVotersByStateData = () => {
+    if (!voterStats) return { labels: [], datasets: [] };
+
+    const states = Object.keys(voterStats.votersByState);
+    const counts = Object.values(voterStats.votersByState);
 
     return {
-      labels: Object.keys(typeCounts).map(key => key.replace('_', ' ').toUpperCase()),
+      labels: states,
       datasets: [{
-        label: 'Elections by Type',
-        data: Object.values(typeCounts),
+        label: 'Registered Voters by State',
+        data: counts,
         backgroundColor: [
           '#10B981', // Green
           '#059669', // Dark Green
           '#047857', // Darker Green
           '#065F46', // Darkest Green
-          '#064E3B'  // Forest Green
+          '#064E3B', // Forest Green
+          '#0F766E', // Teal
+          '#0D9488', // Light Teal
+          '#14B8A6', // Cyan
+          '#06B6D4', // Sky
+          '#0EA5E9'  // Blue
         ],
         borderWidth: 0
       }]
     };
   };
 
-  const getVoteDistributionData = () => {
+  const getGenderDistributionData = () => {
+    if (!voterStats) return { labels: [], datasets: [] };
+
     return {
-      labels: ['Online Votes', 'Offline Votes', 'Sync Pending'],
+      labels: ['Male', 'Female'],
       datasets: [{
-        data: [stats.onlineVotes, stats.offlineVotes - stats.syncPendingVotes, stats.syncPendingVotes],
-        backgroundColor: ['#10B981', '#F59E0B', '#EF4444'],
+        data: [voterStats.genderDistribution.male, voterStats.genderDistribution.female],
+        backgroundColor: ['#3B82F6', '#EC4899'],
         borderWidth: 0
       }]
     };
@@ -169,7 +154,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Voters</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalVoters.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-gray-900">{voterStats?.totalVoters.toLocaleString() || 0}</p>
+              <p className="text-sm text-green-600">{voterStats?.verifiedVoters || 0} verified</p>
             </div>
             <Users className="h-8 w-8 text-green-600" />
           </div>
@@ -178,10 +164,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Votes</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalVotes.toLocaleString()}</p>
+              <p className="text-sm font-medium text-gray-600">Active Voters</p>
+              <p className="text-3xl font-bold text-gray-900">{voterStats?.activeVoters.toLocaleString() || 0}</p>
+              <p className="text-sm text-red-600">{voterStats?.suspendedVoters || 0} suspended</p>
             </div>
-            <Vote className="h-8 w-8 text-green-600" />
+            <CheckCircle className="h-8 w-8 text-green-600" />
           </div>
         </div>
 
@@ -189,7 +176,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Active Elections</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.activeElections}</p>
+              <p className="text-3xl font-bold text-gray-900">{elections.filter(e => e.status === 'active').length}</p>
             </div>
             <Activity className="h-8 w-8 text-green-600" />
           </div>
@@ -198,47 +185,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Biometric Success</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.biometricSuccessRate}%</p>
+              <p className="text-sm font-medium text-gray-600">States Covered</p>
+              <p className="text-3xl font-bold text-gray-900">{Object.keys(voterStats?.votersByState || {}).length}</p>
             </div>
             <Shield className="h-8 w-8 text-green-600" />
           </div>
         </div>
       </div>
 
-      {/* Sync Alert */}
-      {stats.syncPendingVotes > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Clock className="h-6 w-6 text-yellow-600" />
-              <div>
-                <h3 className="text-sm font-medium text-yellow-800">
-                  {stats.syncPendingVotes} votes pending synchronization
-                </h3>
-                <p className="text-sm text-yellow-700">
-                  These offline votes will be synchronized when connection is restored.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleSyncOfflineVotes}
-              disabled={!isOnline}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
-            >
-              Sync Now
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold mb-4">Elections by Type</h3>
+          <h3 className="text-lg font-semibold mb-4">Registered Voters by State</h3>
           <div className="h-64">
             <Bar 
-              data={getElectionTypeData()} 
+              data={getVotersByStateData()} 
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
@@ -254,10 +216,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold mb-4">Vote Distribution</h3>
+          <h3 className="text-lg font-semibold mb-4">Gender Distribution</h3>
           <div className="h-64">
             <Doughnut 
-              data={getVoteDistributionData()} 
+              data={getGenderDistributionData()} 
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
