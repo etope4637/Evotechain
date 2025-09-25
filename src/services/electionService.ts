@@ -15,13 +15,8 @@ export class ElectionService {
 
     await StorageService.addToStore('elections', election);
     
-    // Update voter eligibility for this election
-    await VoterDatabaseService.updateVoterEligibility(
-      election.id, 
-      election.type, 
-      election.state, 
-      election.lga
-    );
+    // Auto-assign eligible voters based on election scope
+    await this.assignEligibleVoters(election);
     
     // Add to blockchain
     await BlockchainService.addBlock({
@@ -72,6 +67,40 @@ export class ElectionService {
     await this.logAudit('election_updated', `Election updated: ${updatedElection.title}`, userId);
 
     return updatedElection;
+  }
+
+  /**
+   * Assign eligible voters to election based on geographic scope
+   */
+  private static async assignEligibleVoters(election: Election): Promise<void> {
+    try {
+      const allVoters = await StorageService.getAllFromStore('voters');
+      let eligibleVoters = allVoters.filter(voter => voter.isActive && voter.isVerified);
+      
+      // Filter by geographic scope
+      if (election.type === 'presidential') {
+        // All voters eligible for presidential elections
+      } else if (election.state) {
+        eligibleVoters = eligibleVoters.filter(voter => voter.state === election.state);
+        
+        if (election.lga) {
+          eligibleVoters = eligibleVoters.filter(voter => voter.lga === election.lga);
+        }
+      }
+
+      // Update each eligible voter's election list
+      for (const voter of eligibleVoters) {
+        if (!voter.eligibleElections.includes(election.id)) {
+          voter.eligibleElections.push(election.id);
+          voter.votingHistory[election.id] = { voted: false };
+          await StorageService.updateInStore('voters', voter);
+        }
+      }
+
+      console.log(`Assigned ${eligibleVoters.length} eligible voters to election: ${election.title}`);
+    } catch (error) {
+      console.error('Error assigning eligible voters:', error);
+    }
   }
 
   static async getAllElections(): Promise<Election[]> {

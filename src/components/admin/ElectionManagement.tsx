@@ -53,13 +53,15 @@ export const ElectionManagement: React.FC<ElectionManagementProps> = ({ onNaviga
     if (!user) return;
 
     try {
-      await ElectionService.createElection({
+      const newElection = await ElectionService.createElection({
         ...formData,
         startDate: new Date(formData.startDate),
         endDate: new Date(formData.endDate),
         status: 'draft',
         createdBy: user.id
       });
+      
+      alert(`Election "${newElection.title}" created successfully! It will appear on voter pages when activated.`);
       
       setShowCreateForm(false);
       setFormData({
@@ -92,15 +94,22 @@ export const ElectionManagement: React.FC<ElectionManagementProps> = ({ onNaviga
   const handleActivateElection = async (election: Election) => {
     if (!user) return;
     
+    if (!confirm(`Are you sure you want to activate "${election.title}"? This will make it available for voting.`)) {
+      return;
+    }
+    
     try {
-      await ElectionService.updateElection(
+      const updatedElection = await ElectionService.updateElection(
         election.id,
         { status: 'active' },
         user.id
       );
+      
+      alert(`Election "${updatedElection.title}" is now active and available for voting!`);
       loadElections();
     } catch (error) {
       console.error('Error activating election:', error);
+      alert('Error activating election. Please try again.');
     }
   };
 

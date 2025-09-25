@@ -24,6 +24,13 @@ export const VotingDashboard: React.FC<VotingDashboardProps> = ({ onNavigate, ni
   useEffect(() => {
     loadVoterData();
     loadElections();
+    
+    // Set up interval to refresh elections every 30 seconds
+    const interval = setInterval(() => {
+      loadElections();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadVoterData = async () => {
@@ -39,18 +46,20 @@ export const VotingDashboard: React.FC<VotingDashboardProps> = ({ onNavigate, ni
     try {
       const allElections = await ElectionService.getAllElections();
       
-      // Filter elections that voter is eligible for
+      // Show all active elections to voters (they can participate if eligible)
       const voterData = await VoterDatabaseService.findVoterByNIN(nin);
       if (voterData) {
-        const eligibleElections = allElections.filter(election => 
-          voterData.eligibleElections.includes(election.id) ||
-          election.status === 'active' // Show all active elections for now
+        // Show all elections (active, upcoming, and completed for transparency)
+        const visibleElections = allElections.filter(election => 
+          election.status === 'active' || 
+          election.status === 'completed' ||
+          (election.status === 'draft' && new Date(election.startDate) > new Date())
         );
-        setElections(eligibleElections);
+        setElections(visibleElections);
         
         // Load results for each election
         const results: { [electionId: string]: any } = {};
-        for (const election of eligibleElections) {
+        for (const election of visibleElections) {
           try {
             const result = await ElectionService.getElectionResults(election.id);
             results[election.id] = result;
@@ -76,6 +85,24 @@ export const VotingDashboard: React.FC<VotingDashboardProps> = ({ onNavigate, ni
   };
 
   const handleElectionSelect = (election: Election) => {
+    // Check if voter is eligible for this election
+    if (!isVoterEligibleForElection(election)) {
+      alert('You are not eligible to vote in this election based on your location.');
+      return;
+    }
+    
+    // Check if election is active
+    const now = new Date();
+    if (new Date(election.startDate) > now) {
+      alert('This election has not started yet.');
+      return;
+    }
+    
+    if (new Date(election.endDate) < now) {
+      alert('This election has ended.');
+      return;
+    }
+    
     setSelectedElection(election);
     setSelectedCandidate('');
     loadCandidates(election.id);
@@ -164,6 +191,36 @@ Powered by INEC
   const getVotedCount = (): number => {
     if (!voter) return 0;
     return Object.values(voter.votingHistory).filter((history: any) => history.voted).length;
+  };
+
+  const isVoterEligibleForElection = (election: Election): boolean => {
+    if (!voter) return false;
+    
+    // Check location-based eligibility
+    if (election.type === 'presidential') {
+      return true; // All voters eligible for presidential
+    }
+    
+    if (election.state && voter.state !== election.state) {
+      return false; // State-specific elections
+    }
+    
+    if (election.lga && voter.lga !== election.lga) {
+      return false; // LGA-specific elections
+    }
+    
+    return true;
+  };
+
+  const canVoteInElection = (election: Election): boolean => {
+    const now = new Date();
+    const isActive = election.status === 'active' && 
+                    new Date(election.startDate) <= now && 
+                    new Date(election.endDate) >= now;
+    const hasNotVoted = !hasVotedInElection(election.id);
+    const isEligible = isVoterEligibleForElection(election);
+    
+    return isActive && hasNotVoted && isEligible;
   };
 
   return (
@@ -314,10 +371,16 @@ Powered by INEC
                                 <span>Total Votes: {result.totalVotes}</span>
                               </>
                             )}
+                            <span>•</span>
+                            <span className={`font-medium ${
+                              isVoterEligibleForElection(election) ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {isVoterEligibleForElection(election) ? 'Eligible' : 'Not Eligible'}
+                            </span>
                           </div>
                         </div>
                         <div className="flex space-x-3">
-                          {!voted && status.status === 'active' && (
+                          {canVoteInElection(election) && (
                             <button
                               onClick={() => handleElectionSelect(election)}
                               className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
@@ -326,13 +389,27 @@ Powered by INEC
                               <span>Vote Now</span>
                             </button>
                           )}
+                          {voted && (
+                            <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg flex items-center space-x-2">
+                              <CheckCircle className="h-4 w-4" />
+                              <span>Vote Cast</span>
+                            </div>
+                          )}
+                          {!isVoterEligibleForElection(election) && (
+                            <div className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg text-sm">
+                              Not Eligible
+                            </div>
+                          )}
                           <button
                             onClick={() => {
-                              // Show detailed results
+                              // Show detailed results with better formatting
                               if (result) {
-                                alert(`Election Results:\n${result.candidateResults.map((c: any) => 
-                                  `${c.candidateName} (${c.party}): ${c.voteCount} votes (${c.percentage.toFixed(1)}%)`
-                                ).join('\n')}`);
+                                const resultText = `${election.title} - Results:\n\n` +
+                                  result.candidateResults.map((c: any, index: number) => 
+                                    `${index + 1}. ${c.candidateName} (${c.party})\n   ${c.voteCount} votes (${c.percentage.toFixed(1)}%)`
+                                  ).join('\n\n') +
+                                  `\n\nTotal Votes: ${result.totalVotes}`;
+                                alert(resultText);
                               }
                             }}
                             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center space-x-2"

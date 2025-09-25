@@ -100,21 +100,31 @@ export const VoterManagement: React.FC<VoterManagementProps> = ({ onNavigate }) 
       const newVoter: Voter = {
         id: crypto.randomUUID(),
         nin: voterForm.nin,
+        ninHash: await CryptoService.generateHash(voterForm.nin + 'VOTER_SALT'),
         firstName: voterForm.firstName,
         lastName: voterForm.lastName,
+        sex: 'male', // Default - should be collected in form
+        dateOfBirth: new Date('1990-01-01'), // Default - should be collected in form
         email: voterForm.email,
         phone: voterForm.phone,
         state: voterForm.state,
         lga: voterForm.lga,
         ward: voterForm.ward,
         pollingUnit: voterForm.pollingUnit,
-        biometricHash: '', // Will be set during face enrollment
+        
+        // Biometric data (will be set during enrollment)
+        biometricHash: '',
+        faceEmbedding: [],
+        biometricQuality: 0,
+        
         registrationDate: new Date(),
         isVerified: false,
         isActive: true,
+        registrationSource: 'online',
         eligibleElections: [],
-        hasVoted: {},
-        loginAttempts: 0
+        votingHistory: {},
+        loginAttempts: 0,
+        biometricAttempts: 0
       };
 
       await StorageService.addToStore('voters', newVoter);

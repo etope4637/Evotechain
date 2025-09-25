@@ -265,7 +265,7 @@ export class VoterAuthService {
         return {
           success: false,
           requiresRegistration: false,
-          error: `Face verification failed. Similarity: ${(authResult.similarity * 100).toFixed(1)}%`,
+          error: `Face verification failed. Similarity: ${(authResult.similarity * 100).toFixed(1)}% (Required: 70%)`,
           similarity: authResult.similarity
         };
       }

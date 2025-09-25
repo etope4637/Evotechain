@@ -202,7 +202,7 @@ export class VoterDatabaseService {
 
       // Compare biometric data
       const similarity = await this.compareBiometricData(capturedEmbedding, voter.faceEmbedding);
-      const threshold = 0.85; // 85% similarity threshold
+      const threshold = 0.70; // 70% similarity threshold
 
       if (similarity >= threshold) {
         // Reset attempt counters on successful login

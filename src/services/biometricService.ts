@@ -284,7 +284,7 @@ export class BiometricService {
   }> {
     try {
       const similarity = await this.compareFaceEmbeddings(capturedEmbedding, storedEmbedding);
-      const threshold = 0.85; // High threshold for voter authentication
+      const threshold = 0.70; // Reduced threshold for voter authentication
       
       return {
         match: similarity >= threshold,

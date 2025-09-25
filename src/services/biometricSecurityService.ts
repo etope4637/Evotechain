@@ -7,7 +7,7 @@ export class BiometricSecurityService {
   private static isModelLoaded = false;
   
   // Enhanced security thresholds
-  private static readonly CONFIDENCE_THRESHOLD = 0.85;
+  private static readonly CONFIDENCE_THRESHOLD = 0.70;
   private static readonly LIVENESS_THRESHOLD = 0.75;
   private static readonly QUALITY_THRESHOLD = 0.70;
   private static readonly MIN_BLINK_COUNT = 2;
